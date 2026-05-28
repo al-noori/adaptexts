@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>adaptexts — dataset browser</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg: #f6f8fa;
+      --surface: #ffffff;
+      --border: #d0d7de;
+      --border-light: #eaeef2;
+      --text: #24292f;
+      --text-muted: #57606a;
+      --primary: #0969da;
+      --primary-bg: #ddf4ff;
+      --green: #1a7f37;
+      --green-bg: #dafbe1;
+      --danger: #cf222e;
+      --danger-bg: #ffebe9;
+      --warning: #9a6700;
+      --warning-bg: #fff8c5;
+      --radius: 6px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo {
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      font-family: "SFMono-Regular", Consolas, monospace;
+    }
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-link {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .header-link:hover { color: var(--primary); }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 24px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 36px;
+      margin-bottom: 28px;
+    }
+    .hero h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 10px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+    }
+    .hero p {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin: 0 0 20px;
+      max-width: 680px;
+      line-height: 1.6;
+    }
+    .hero p strong { color: var(--text); }
+    .stats-bar {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 500;
+    }
+
+    /* ── Breadcrumb ── */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+    .breadcrumb a { color: var(--primary); text-decoration: none; cursor: pointer; }
+    .breadcrumb a:hover { text-decoration: underline; }
+    .breadcrumb .sep { color: var(--border); }
+    .breadcrumb .current { color: var(--text); font-weight: 500; }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-header h2 { font-size: 18px; font-weight: 600; margin: 0; }
+    .ts { font-size: 12px; color: var(--text-muted); }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .badge-green  { background: var(--green-bg);   color: var(--green); }
+    .badge-blue   { background: var(--primary-bg); color: var(--primary); }
+    .badge-gray   { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Adapter cards ── */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      cursor: pointer;
+      transition: border-color .12s, box-shadow .12s;
+    }
+    .card:hover { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(9,105,218,.08); }
+    .card-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .card-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5; }
+    .card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .ds-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+    /* ── Property legend ── */
+    .legend {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-top: 20px;
+    }
+    .legend-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 8px 24px;
+    }
+    .legend-item { display: flex; align-items: flex-start; gap: 8px; }
+    .legend-item .badge { flex-shrink: 0; margin-top: 1px; }
+    .legend-item p { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+
+    /* ── Properties info bar ── */
+    .props-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+    .props-label { font-size: 12px; color: var(--text-muted); font-weight: 500; margin-right: 2px; }
+
+    /* ── Table ── */
+    .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { background: var(--bg); }
+    th { padding: 8px 14px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+    th.r { text-align: right; }
+    td { padding: 9px 14px; border-bottom: 1px solid var(--border-light); }
+    tr:last-child td { border-bottom: none; }
+    td.r { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover td { background: #f0f6ff; }
+    td.name { font-weight: 500; color: var(--primary); }
+    td.err { color: var(--danger); font-size: 12px; }
+
+    /* ── Type tags ── */
+    .type-tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+    .type-binary     { background: var(--green-bg); color: var(--green); }
+    .type-manyvalued { background: var(--warning-bg); color: var(--warning); }
+    .tag-scaled   { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 500; background: var(--primary-bg); color: var(--primary); margin-left: 6px; }
+    .tag-concepts { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 500; background: var(--green-bg); color: var(--green); margin-left: 6px; }
+
+    /* ── Detail sections ── */
+    .detail-sections { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; }
+    .detail-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .detail-section-header {
+      padding: 10px 18px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+    .detail-section-body { padding: 20px 18px; }
+
+    /* ── Metric cards ── */
+    .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+    .metric { background: var(--bg); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 16px 14px; text-align: center; }
+    .metric-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1.1; margin-bottom: 5px; font-variant-numeric: tabular-nums; }
+    .metric-name  { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+    .metric-desc  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Source metadata ── */
+    .meta-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .meta-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .meta-table tr { border-bottom: 1px solid var(--border-light); }
+    .meta-table tr:last-child { border-bottom: none; }
+    .meta-table td { padding: 7px 0; vertical-align: top; overflow-wrap: break-word; word-break: break-word; }
+    .meta-table td:first-child { font-weight: 500; color: var(--text-muted); width: 140px; padding-right: 16px; white-space: nowrap; }
+    .meta-abstract { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 0; }
+    .meta-citation { font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+    .meta-citation:last-child { margin-bottom: 0; }
+    .chart-wrap { max-width: 480px; margin-top: 4px; }
+    .hasse-wrap { margin-top: 4px; overflow: auto; }
+    .hasse-wrap img { max-width: 100%; height: auto; }
+    .no-metadata { font-size: 13px; color: var(--text-muted); font-style: italic; }
+
+    /* ── Code snippet ── */
+    .code-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text);
+      margin: 0;
+    }
+    .code-copy {
+      font-size: 11px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text-muted);
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      background: transparent;
+    }
+    .code-copy:hover { color: var(--primary); border-color: var(--primary); }
+
+    /* ── Error / empty ── */
+    .error-box { background: var(--danger-bg); border: 1px solid #ffcecb; border-radius: var(--radius); padding: 14px 18px; margin-top: 16px; color: var(--danger); font-size: 13px; }
+    .empty { text-align: center; padding: 64px 24px; color: var(--text-muted); }
+    .empty h3 { margin: 0 0 8px; font-size: 16px; color: var(--text); }
+    .empty p { margin: 0; }
+    .empty code { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      header { padding: 0 16px; gap: 10px; }
+.header-link { font-size: 12px; }
+
+      .container { padding: 16px 14px; }
+
+      .hero { padding: 20px 18px; margin-bottom: 18px; }
+      .hero h1 { font-size: 18px; }
+      .hero p { font-size: 14px; }
+      .stat-value { font-size: 18px; }
+
+      .cards { grid-template-columns: 1fr; }
+
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { min-width: 480px; }
+      td.name { white-space: normal; }
+      .tag-scaled, .tag-concepts { margin-left: 4px; margin-top: 3px; vertical-align: middle; }
+
+      .metrics { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+      .metric { padding: 12px 10px; }
+      .metric-value { font-size: 20px; }
+
+      .chart-wrap { max-width: 100%; }
+
+      .meta-table td:first-child { white-space: normal; }
+
+      .legend-grid { grid-template-columns: 1fr; }
+
+      .detail-section-body { padding: 14px 14px; }
+      .props-bar { padding: 10px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo" onclick="go('')">adaptexts</span>
+  <div class="header-right">
+<a class="header-link" href="paper/adaptexts.pdf" target="_blank">Paper</a>
+    <a class="header-link" onclick="go('tutorial')" style="cursor:pointer">Tutorial</a>
+  </div>
+</header>
+
+<div class="container" id="app"></div>
+
+<script>
+  let DATA = null;
+
+  // ── Routing ──────────────────────────────────────────────────────────────
+  function go(hash) { location.hash = hash ? "#" + hash : "#"; }
+  function parts() {
+    const h = location.hash.replace(/^#\/?/, "").trim();
+    return h ? h.split("/") : [];
+  }
+  window.addEventListener("hashchange", render);
+
+// ── Static adapter descriptions ──────────────────────────────────────────
+  const ADAPTER_DESC = {
+    uciml: "UCI ML Repository datasets scaled to formal contexts.",
+    rwc:   "Real-world contexts from the fcatools/contexts Git repository (Burmeister format).",
+    ipc:   "Formal contexts from the dominance order of integer partitions.",
+  };
+
+  // ── Data loading ─────────────────────────────────────────────────────────
+  async function init() {
+    try {
+      const res = await fetch("data.json");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      DATA = await res.json();
+    } catch (_) { DATA = null; }
+    render();
+  }
+
+  // ── Render dispatcher ─────────────────────────────────────────────────────
+  function render() {
+    const app = document.getElementById("app");
+    const p = parts();
+    if (p[0] === "tutorial") { renderTutorial(app); return; }
+    if (!DATA) { app.innerHTML = noDataHtml(); return; }
+    if (p.length === 0)      renderAdapters(app);
+    else if (p.length === 1) renderDatasets(app, p[0]);
+    else                     renderDataset(app,  p[0], p[1]);
+  }
+
+  // ── Views ─────────────────────────────────────────────────────────────────
+
+  function renderAdapters(app) {
+    const { adapters, generated_at } = DATA;
+
+    // Stats
+    const totalDatasets = adapters.reduce((s, a) => s + a.datasets.filter(d => !d.error).length, 0);
+    const totalObjects  = adapters.reduce((s, a) => s + a.datasets.reduce((ss, d) => ss + (d.metrics?.n_objects || 0), 0), 0);
+
+    const hero = `<div class="hero">
+      <h1>adaptexts</h1>
+      <p>
+        Formal Concept Analysis (FCA) is a mathematical framework for data analysis based on formal
+        contexts, yet acquiring such contexts from heterogeneous, real-world sources remains
+        labor-intensive. The <strong>adaptexts</strong> Python package introduces a generic adapter architecture
+        that allows for custom conversion of diverse data sources. By encapsulating common properties
+        (e.g., determinism, versionability, sortability) and offering a caching mechanism for expensive
+        transformations, this package streamlines the preparation of experimental data and paves the way for
+        reusable, composable &ldquo;tools&rdquo; that operate on sets of contexts. We include implementations
+        of the adapter interface to obtain formal contexts from Git repositories, integer-partition, and UCI-ML
+        datasets. This work outlines the design, current implementation, and future directions of the package,
+        highlighting a path towards an extensible platform for FCA-based data analysis.
+      </p>
+    </div>`;
+
+    const cards = adapters.map(a => {
+      const p = a.properties;
+      const badges = propBadges(p, false);
+      const n = a.datasets.filter(d => !d.error).length;
+      const errs = a.datasets.filter(d => d.error).length;
+      const errNote = errs ? ` <span style="color:var(--danger)">(${errs} error${errs > 1?"s":""})</span>` : "";
+      const desc = esc(ADAPTER_DESC[a.id] || "");
+      return `<div class="card" onclick="go('${esc(a.id)}')">
+        <div class="card-title">${esc(a.name)}</div>
+        <div class="card-desc">${desc}</div>
+        <div class="card-footer">
+          <div class="badge-row">${badges}</div>
+          <div class="ds-count">${n} dataset${n!==1?"s":""}${errNote}</div>
+        </div>
+      </div>`;
+    }).join("");
+
+    const ts = generated_at ? `<span class="ts">Generated ${new Date(generated_at).toLocaleString()}</span>` : "";
+
+    const legend = `<div class="legend">
+      <div class="legend-title">Adapter property legend</div>
+      <div class="legend-grid">
+        <div class="legend-item">${badge("deterministic","green")}<p>Repeated runs yield identical contexts.</p></div>
+        <div class="legend-item">${badge("sortable","green")}<p>Contexts are returned in a consistent order.</p></div>
+        <div class="legend-item">${badge("versionable","blue")}<p>A specific historical source state can be pinpointed.</p></div>
+        <div class="legend-item">${badge("has metadata","blue")}<p>Structured metadata is available per context.</p></div>
+        <div class="legend-item">${badge("stateless","gray")}<p>No internal mutable state — safe for concurrent use.</p></div>
+      </div>
+    </div>`;
+
+    app.innerHTML = `${hero}
+      <div class="section-header"><h2>Adapters</h2>${ts}</div>
+      <div class="cards">${cards}</div>
+      ${legend}`;
+  }
+
+  function renderDatasets(app, aid) {
+    const adapter = DATA.adapters.find(a => a.id === aid);
+    if (!adapter) { app.innerHTML = notFound(`<a onclick="go('')">← Adapters</a>`); return; }
+
+    const p = adapter.properties;
+    const hasManyValued = adapter.datasets.some(d => d.metrics?.context_type === "ManyValuedContext");
+    const rows = adapter.datasets.map(d => {
+      if (d.error) return `<tr><td class="name">${esc(d.name)}</td><td class="err" colspan="${hasManyValued ? 5 : 5}">Error: ${esc(d.error)}</td></tr>`;
+      const m = d.metrics;
+      const wCell = hasManyValued ? `<td class="r">${fmt(m.n_values)}</td>` : "";
+      const densityCell = hasManyValued ? "" : `<td class="r">${pct(m.density)}</td>`;
+      const scaledBadge   = d.scaled_metrics ? `<span class="tag-scaled">Scaled</span>` : "";
+      const conceptsBadge = d.scaled_metrics?.concept_sizes?.length ? `<span class="tag-concepts">|B| computed</span>` : "";
+      return `<tr class="clickable" onclick="go('${esc(aid)}/${esc(d.id)}')">
+        <td class="name">${esc(d.name)}${scaledBadge}${conceptsBadge}</td>
+        <td>${typeTag(m.context_type)}</td>
+        <td class="r">${fmt(m.n_objects)}</td>
+        <td class="r">${fmt(m.n_attributes)}</td>
+        ${wCell}
+        <td class="r">${fmt(m.n_incidences)}</td>
+        ${densityCell}
+      </tr>`;
+    }).join("");
+
+    const wHeader = hasManyValued ? `<th class="r">|W|</th>` : "";
+    const densityHeader = hasManyValued ? "" : `<th class="r">Density</th>`;
+
+    app.innerHTML = `
+      <div class="breadcrumb">
+        <a onclick="go('')">Adapters</a><span class="sep">/</span>
+        <span class="current">${esc(adapter.name)}</span>
+      </div>
+      <div class="section-header"><h2>${esc(adapter.name)}</h2></div>
+      <div class="props-bar"><span class="props-label">Properties:</span>${propBadges(p, true)}</div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Dataset</th><th>Type</th>
+          <th class="r">|G|</th><th class="r">|M|</th>
+          ${wHeader}
+          <th class="r">|I|</th>${densityHeader}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  }
+
+  function renderDataset(app, aid, did) {
+    const adapter = DATA.adapters.find(a => a.id === aid);
+    if (!adapter) { go(aid); return; }
+    const dataset = adapter.datasets.find(d => d.id === did);
+    if (!dataset) { go(aid); return; }
+
+    const breadcrumb = `<div class="breadcrumb">
+      <a onclick="go('')">Adapters</a><span class="sep">/</span>
+      <a onclick="go('${esc(aid)}')">${esc(adapter.name)}</a><span class="sep">/</span>
+      <span class="current">${esc(dataset.name)}</span>
+    </div>`;
+
+    let sections = "";
+
+    if (dataset.error) {
+      sections = `<div class="error-box"><strong>Failed to load this dataset:</strong><br>${esc(dataset.error)}</div>`;
+    } else {
+      const m = dataset.metrics;
+
+      // Context Metrics section
+      const isMany = m.context_type === "ManyValuedContext";
+      let metricCards;
+      if (isMany) {
+        metricCards = [
+          metricCard(fmt(m.n_objects),    "|G|", "Objects"),
+          metricCard(fmt(m.n_attributes), "|M|", "Attributes"),
+          metricCard(fmt(m.n_values),     "|W|", "Values"),
+          metricCard(fmt(m.n_incidences), "|I|", "Incidences"),
+        ].join("");
+      } else {
+        const conceptCard = m.n_concepts != null
+          ? metricCard(fmt(m.n_concepts), "|B|", "Formal concepts")
+          : metricCard("–", "|B|", "Too large to compute");
+        metricCards = [
+          metricCard(fmt(m.n_objects),    "|G|",     "Objects"),
+          metricCard(fmt(m.n_attributes), "|M|",     "Attributes"),
+          metricCard(fmt(m.n_incidences), "|I|",     "Incidences"),
+          metricCard(pct(m.density),      "Density", "|I| / (|G|×|M|)"),
+          conceptCard,
+          m.height != null ? metricCard(fmt(m.height), "Height", "Longest chain ⊥ → ⊤") : "",
+          m.n_join_irreducibles != null ? metricCard(fmt(m.n_join_irreducibles), "Join-irr.", "Join-irreducible concepts") : "",
+          m.n_meet_irreducibles != null ? metricCard(fmt(m.n_meet_irreducibles), "Meet-irr.", "Meet-irreducible concepts") : "",
+        ].join("");
+      }
+
+      const chartId = "chart_" + dataset.id;
+      const distPlot = (!isMany && m.concept_sizes?.length)
+        ? `<div style="margin-top:16px"><div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Concept Distribution</div><div class="chart-wrap"><canvas id="${chartId}"></canvas></div></div>`
+        : "";
+
+      const metricsSection = `<div class="detail-section">
+        <div class="detail-section-header">Context Metrics</div>
+        <div class="detail-section-body">
+          <div style="margin-bottom:14px">${typeTag(m.context_type)}</div>
+          <div class="metrics">${metricCards}</div>
+          ${distPlot}
+        </div>
+      </div>`;
+
+      if (!isMany && m.concept_sizes?.length) {
+        setTimeout(() => {
+          const el = document.getElementById(chartId);
+          if (!el) return;
+          const nObj = m.n_objects, nAttr = m.n_attributes;
+          const countMap = {};
+          for (const [ext, int_] of m.concept_sizes) {
+            const key = `${ext}|${int_}`;
+            countMap[key] = (countMap[key] || { x: ext / nObj, y: int_ / nAttr, count: 0 });
+            countMap[key].count++;
+          }
+          const pts = Object.values(countMap);
+          new Chart(el, {
+            type: "scatter",
+            data: { datasets: [{ data: pts, backgroundColor: "rgba(9,105,218,0.45)",
+              pointRadius: 4, pointHoverRadius: 6 }] },
+            options: {
+              plugins: { legend: { display: false },
+                tooltip: { callbacks: { label: ctx => {
+                  const d = ctx.raw;
+                  const cnt = d.count > 1 ? ` — ${d.count} concepts` : " — 1 concept";
+                  return `(${(d.x*100).toFixed(0)}%, ${(d.y*100).toFixed(0)}%)${cnt}`;
+                }}}},
+              scales: {
+                x: { min: 0, max: 1, title: { display: true, text: "Relative extent  |A′′| / |G|" },
+                  ticks: { callback: v => (v*100).toFixed(0)+"%" } },
+                y: { min: 0, max: 1, title: { display: true, text: "Relative intent  |B′′| / |M|" },
+                  ticks: { callback: v => (v*100).toFixed(0)+"%" } }
+              }
+            }
+          });
+        }, 0);
+      }
+      const distSection = "";
+
+      // Source Metadata section
+      const meta = dataset.metadata;
+      let metaSection = "";
+      let metaBody;
+      if (!adapter.properties.has_metadata) {
+        metaBody = null;
+      } else if (!meta || Object.keys(meta).length === 0) {
+        metaBody = `<p class="no-metadata">No source metadata available for this dataset.</p>`;
+      } else {
+        const rows = [];
+        // UCIML fields
+        if (meta.abstract)  rows.push(`<tr><td>Abstract</td><td><p class="meta-abstract">${esc(meta.abstract)}</p></td></tr>`);
+        if (meta.area)      rows.push(`<tr><td>Area</td><td>${esc(meta.area)}</td></tr>`);
+        if (meta.tasks?.length) rows.push(`<tr><td>Tasks</td><td>${meta.tasks.map(esc).join(", ")}</td></tr>`);
+        if (meta.year)      rows.push(`<tr><td>Year</td><td>${meta.year}</td></tr>`);
+        if (meta.creators?.length) rows.push(`<tr><td>Creators</td><td>${meta.creators.map(esc).join(", ")}</td></tr>`);
+        if (meta.characteristics?.length) rows.push(`<tr><td>Characteristics</td><td>${meta.characteristics.map(esc).join(", ")}</td></tr>`);
+        if (meta.feature_types?.length)   rows.push(`<tr><td>Feature types</td><td>${meta.feature_types.map(esc).join(", ")}</td></tr>`);
+        // RWC fields
+        if (meta.title)       rows.push(`<tr><td>Title</td><td>${esc(meta.title)}</td></tr>`);
+        if (meta.description) rows.push(`<tr><td>Description</td><td><p class="meta-abstract">${esc(meta.description)}</p></td></tr>`);
+        if (meta.language)    rows.push(`<tr><td>Language</td><td>${esc(meta.language)}</td></tr>`);
+        if (meta.note)        rows.push(`<tr><td>Note</td><td>${esc(meta.note)}</td></tr>`);
+        if (meta.source?.length) rows.push(`<tr><td>Source</td><td>${meta.source.map(s => `<div class="meta-citation">${esc(s)}</div>`).join("")}</td></tr>`);
+        metaBody = rows.length
+          ? `<div class="meta-table-wrap"><table class="meta-table">${rows.join("")}</table></div>`
+          : `<p class="no-metadata">No source metadata available for this dataset.</p>`;
+      }
+
+      if (metaBody !== null) metaSection = `<div class="detail-section">
+        <div class="detail-section-header">Source Metadata</div>
+        <div class="detail-section-body">${metaBody}</div>
+      </div>`;
+
+      let scaledSection = "";
+      if (dataset.scaled_metrics) {
+        const s = dataset.scaled_metrics;
+        const sConceptCard = s.n_concepts != null
+          ? metricCard(fmt(s.n_concepts), "|B|", "Formal concepts")
+          : metricCard("–", "|B|", "Too large to compute");
+        const scaledChartId = "chart_scaled_" + dataset.id;
+        const scaledPlot = s.concept_sizes?.length ? `<div style="margin-top:16px"><div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Concept Distribution</div><div class="chart-wrap"><canvas id="${scaledChartId}"></canvas></div></div>` : "";
+        scaledSection = `<div class="detail-section">
+          <div class="detail-section-header">After Automatic Scaling</div>
+          <div class="detail-section-body">
+            <div style="margin-bottom:14px">${typeTag("Context")}</div>
+            <div class="metrics">
+              ${metricCard(fmt(s.n_objects),    "|G|",     "Objects")}
+              ${metricCard(fmt(s.n_attributes), "|M'|",    "Scaled attributes")}
+              ${metricCard(fmt(s.n_incidences), "|I'|",    "Incidences")}
+              ${metricCard(pct(s.density),      "Density", "|I'| / (|G|×|M'|)")}
+              ${sConceptCard}
+            </div>
+            ${scaledPlot}
+          </div>
+        </div>`;
+        if (s.concept_sizes?.length) {
+          setTimeout(() => {
+            const el = document.getElementById(scaledChartId);
+            if (!el) return;
+            const nObj = s.n_objects, nAttr = s.n_attributes;
+            const sCountMap = {};
+            for (const [ext, int_] of s.concept_sizes) {
+              const key = `${ext}|${int_}`;
+              sCountMap[key] = (sCountMap[key] || { x: ext / nObj, y: int_ / nAttr, count: 0 });
+              sCountMap[key].count++;
+            }
+            const sPts = Object.values(sCountMap);
+            new Chart(el, {
+              type: "scatter",
+              data: { datasets: [{ data: sPts, backgroundColor: "rgba(9,105,218,0.45)", pointRadius: 4, pointHoverRadius: 6 }] },
+              options: {
+                plugins: { legend: { display: false },
+                  tooltip: { callbacks: { label: ctx => {
+                    const d = ctx.raw;
+                    const cnt = d.count > 1 ? ` — ${d.count} concepts` : " — 1 concept";
+                    return `(${(d.x*100).toFixed(0)}%, ${(d.y*100).toFixed(0)}%)${cnt}`;
+                  }}}},
+                scales: {
+                  x: { min: 0, max: 1, title: { display: true, text: "Relative extent  |A′′| / |G|" }, ticks: { callback: v => (v*100).toFixed(0)+"%" } },
+                  y: { min: 0, max: 1, title: { display: true, text: "Relative intent  |B′′| / |M'|" }, ticks: { callback: v => (v*100).toFixed(0)+"%" } }
+                }
+              }
+            });
+          }, 0);
+        }
+      }
+
+      const snippetId = "snippet_" + dataset.id;
+      const snippetSection = `<div class="detail-section">
+        <div class="detail-section-header" style="display:flex;justify-content:space-between;align-items:center">
+          Python Usage
+          <button class="code-copy" onclick="copySnippet('${snippetId}')">Copy</button>
+        </div>
+        <div class="detail-section-body" style="padding:0">
+          <pre class="code-block" id="${snippetId}">${esc(pythonSnippet(aid, dataset))}</pre>
+        </div>
+      </div>`;
+
+      sections = `<div class="detail-sections">${metricsSection}${distSection}${scaledSection}${snippetSection}${metaSection}</div>`;
+    }
+
+    app.innerHTML = `${breadcrumb}
+      <div class="section-header"><h2>${esc(dataset.name)}</h2></div>
+      ${sections}`;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function metricCard(value, name, desc) {
+    return `<div class="metric">
+      <div class="metric-value">${value}</div>
+      <div class="metric-name">${name}</div>
+      <div class="metric-desc">${desc}</div>
+    </div>`;
+  }
+
+  function typeTag(type, long) {
+    if (type === "ManyValuedContext") {
+      return `<span class="type-tag type-manyvalued">Many-valued</span>`;
+    }
+    return `<span class="type-tag type-binary">${long ? "Binary Context" : "Binary"}</span>`;
+  }
+
+  function propBadges(p, verbose) {
+    return [
+      p.is_deterministic ? badge("deterministic","green") : (verbose ? badge("non-deterministic","gray") : ""),
+      p.is_sortable      ? badge("sortable","green")      : (verbose ? badge("not sortable","gray") : ""),
+      p.is_versionable   ? badge("versionable","blue")    : "",
+      p.has_metadata     ? badge("has metadata","blue")   : "",
+      p.is_stateless     ? badge("stateless","gray")      : "",
+    ].filter(Boolean).join("");
+  }
+
+  function badge(label, color) {
+    return `<span class="badge badge-${color}">${label}</span>`;
+  }
+
+  function noDataHtml() {
+    return `<div class="empty"><h3>No data found</h3>
+      <p>Run <code>python scripts/generate_data.py</code> to generate <code>docs/data.json</code>, then reload.</p>
+    </div>`;
+  }
+
+  function notFound(back) {
+    return `<div class="empty"><h3>Not found</h3><p>${back}</p></div>`;
+  }
+
+  function fmt(n)  { return n == null ? "–" : Number(n).toLocaleString(); }
+  function fmtK(n) {
+    if (n == null) return "–";
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(0) + "k";
+    return String(n);
+  }
+  function pct(d)  { return d == null ? "–" : (d * 100).toFixed(1) + "%"; }
+  function esc(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function renderTutorial(app) {
+    const step = (n, title, body) => `<div class="detail-section">
+      <div class="detail-section-header">Step ${n} — ${title}</div>
+      <div class="detail-section-body">${body}</div>
+    </div>`;
+
+    const snippetHtml = (id, code) => `
+      <div style="position:relative">
+        <button class="code-copy" style="position:absolute;top:10px;right:10px" onclick="copySnippet('${id}')">Copy</button>
+        <pre class="code-block" id="${id}">${esc(code)}</pre>
+      </div>`;
+
+    const adapterCode =
+`from adaptexts.adapters.interface import AdapterInterface
+from adaptexts.context import Context
+
+class MyAdapter(AdapterInterface):
+    def __iter__(self):
+        yield Context(
+            ["cat", "dog", "fish"],
+            ["legs", "fur", "swims"],
+            {("cat", "legs"), ("cat", "fur"),
+             ("dog", "legs"), ("dog", "fur"),
+             ("fish", "swims")},
+            name="animals",
+        )
+
+    def __len__(self):            return 1
+    def is_sortable(self):        return True
+    def is_versionable(self):     return False
+    def is_deterministic(self):   return True
+    def is_stateless(self):       return True
+    def has_metadata(self):       return False`;
+
+    const registerCode =
+`# user_adapters.py — repo root
+from my_adapter import MyAdapter
+
+ADAPTERS = [
+    ("My Adapter", "my_adapter", MyAdapter()),
+]`;
+
+    const runCode =
+`# Full run (includes uciml, rwc, ipc — takes 20–60 min)
+python scripts/generate_data.py
+
+# Only your adapter (fast)
+python scripts/generate_data.py --adapters ""
+
+# Limit to N contexts per adapter
+python scripts/generate_data.py --adapters "" --limit 3`;
+
+    const metaCode =
+`    def has_metadata(self):  return True
+
+    def get_metadata(self, name: str) -> dict | None:
+        meta = {
+            "animals": {
+                # Recognised keys — all optional:
+                # title, description, abstract, language, note,
+                # area, year, tasks, creators, characteristics,
+                # feature_types, source (list of strings/URLs)
+                "title":  "Animals toy context",
+                "year":   2024,
+                "source": ["https://example.org/animals"],
+            },
+        }
+        return meta.get(name)`;
+
+    app.innerHTML = `
+      <div class="breadcrumb">
+        <a onclick="go('')">Adapters</a><span class="sep">/</span>
+        <span class="current">Tutorial</span>
+      </div>
+      <div class="section-header" style="margin-top:4px"><h2>Adding a custom adapter</h2></div>
+      <div class="detail-sections">
+        ${step(1, "Implement <code style='font-family:monospace'>AdapterInterface</code>",
+          `<p style="margin:0 0 12px;font-size:13px;color:var(--text-muted)">
+            Yield <code style="font-family:monospace">Context</code> or <code style="font-family:monospace">ManyValuedContext</code>
+            objects with <code style="font-family:monospace">.name</code> set.
+            The five boolean methods control which badges appear on the adapter card:
+          </p>
+          <table style="font-size:12px;border-collapse:collapse;margin-bottom:16px;width:100%">
+            <thead><tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:5px 12px 5px 0;color:var(--text-muted);font-weight:600">Method</th>
+              <th style="text-align:left;padding:5px 12px 5px 0;color:var(--text-muted);font-weight:600">Badge</th>
+              <th style="text-align:left;padding:5px 0;color:var(--text-muted);font-weight:600">Meaning</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border-light)"><td style="padding:6px 12px 6px 0;font-family:monospace">is_deterministic</td><td style="padding:6px 12px 6px 0">${badge("deterministic","green")}</td><td style="padding:6px 0;color:var(--text-muted)">Repeated runs yield identical contexts.</td></tr>
+              <tr style="border-bottom:1px solid var(--border-light)"><td style="padding:6px 12px 6px 0;font-family:monospace">is_sortable</td><td style="padding:6px 12px 6px 0">${badge("sortable","green")}</td><td style="padding:6px 0;color:var(--text-muted)">Contexts are returned in a consistent order.</td></tr>
+              <tr style="border-bottom:1px solid var(--border-light)"><td style="padding:6px 12px 6px 0;font-family:monospace">is_versionable</td><td style="padding:6px 12px 6px 0">${badge("versionable","blue")}</td><td style="padding:6px 0;color:var(--text-muted)">A specific historical source state can be reproduced.</td></tr>
+              <tr style="border-bottom:1px solid var(--border-light)"><td style="padding:6px 12px 6px 0;font-family:monospace">has_metadata</td><td style="padding:6px 12px 6px 0">${badge("has metadata","blue")}</td><td style="padding:6px 0;color:var(--text-muted)">Structured metadata is available per context (see Step 4).</td></tr>
+              <tr><td style="padding:6px 12px 6px 0;font-family:monospace">is_stateless</td><td style="padding:6px 12px 6px 0">${badge("stateless","gray")}</td><td style="padding:6px 0;color:var(--text-muted)">No internal mutable state — safe for concurrent use.</td></tr>
+            </tbody>
+          </table>
+          ${snippetHtml("tut_adapter", adapterCode)}`
+        )}
+        ${step(2, "Register in <code style='font-family:monospace'>user_adapters.py</code>",
+          `<p style="margin:0 0 14px;font-size:13px;color:var(--text-muted)">
+            Add a <code style="font-family:monospace">(display_name, adapter_id, instance)</code> tuple to
+            <code style="font-family:monospace">ADAPTERS</code>. The <code style="font-family:monospace">adapter_id</code>
+            must be unique, URL-safe, and lowercase.
+          </p>
+          ${snippetHtml("tut_register", registerCode)}`
+        )}
+        ${step(3, "Run the generator",
+          `<p style="margin:0 0 14px;font-size:13px;color:var(--text-muted)">
+            Writes <code style="font-family:monospace">docs/data.json</code>. Reload the page to see your adapter.
+          </p>
+          ${snippetHtml("tut_run", runCode)}`
+        )}
+        ${step(4, "Optional: add metadata",
+          `<p style="margin:0 0 14px;font-size:13px;color:var(--text-muted)">
+            When <code style="font-family:monospace">has_metadata()</code> returns <code style="font-family:monospace">True</code>,
+            the generator calls <code style="font-family:monospace">get_metadata(name)</code> per context.
+            Return a dict — recognised keys are shown in the <strong>Source Metadata</strong> section of each dataset page.
+          </p>
+          ${snippetHtml("tut_meta", metaCode)}`
+        )}
+      </div>`;
+  }
+
+  function pythonSnippet(aid, dataset) {
+    const name = dataset.name;
+    if (aid === "ipc") {
+      const m = name.match(/n=(\d+)/);
+      const n = m ? m[1] : "?";
+      return `from adaptexts.adapters.examples.ipc import IPCAdapter\n\ncontext = next(iter(IPCAdapter(n=${n})))\ndf = context.to_df()`;
+    }
+    if (aid === "rwc") {
+      return `from adaptexts.adapters.examples.rwc import RWCAdapter\n\nadapter = RWCAdapter()\ncontext = next(ctx for ctx in adapter if ctx.name == ${JSON.stringify(name)})\ndf = context.to_df()`;
+    }
+    if (aid === "uciml") {
+      const base = `from adaptexts.adapters.examples import UCIMLAdapter\n\nadapter = UCIMLAdapter()\nctx = adapter.get_context(${JSON.stringify(name)})  # ManyValuedContext`;
+      if (dataset.scaled_metrics) {
+        return base + `\n\nfrom adaptexts.tools.scaling import ScalingTool\n\nwith ScalingTool(auto_server=True) as scaler:\n    scaled = scaler.automatic_scale(ctx)  # Context (binary)\n\ndf = scaled.to_df()`;
+      }
+      return base + `\ndf = ctx.to_df()`;
+    }
+    return `context = adapter.get_context(${JSON.stringify(name)})\ndf = context.to_df()`;
+  }
+
+  function copySnippet(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard?.writeText(el.textContent.trim());
+    const btn = el.closest(".detail-section").querySelector(".code-copy");
+    if (btn) { btn.textContent = "Copied!"; setTimeout(() => btn.textContent = "Copy", 1500); }
+  }
+
+  init();
+</script>
+</body>
+</html>
